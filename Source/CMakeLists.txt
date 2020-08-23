@@ -5,6 +5,7 @@ set (LUABRIDGE_HEADERS
 	${CMAKE_CURRENT_SOURCE_DIR}/LuaBridge/RefCountedObject.h
 	${CMAKE_CURRENT_SOURCE_DIR}/LuaBridge/RefCountedPtr.h
 	${CMAKE_CURRENT_SOURCE_DIR}/LuaBridge/Vector.h
+	${CMAKE_CURRENT_SOURCE_DIR}/LuaBridge/Array.h
 )
 source_group ("LuaBridge" FILES ${LUABRIDGE_HEADERS})
 
