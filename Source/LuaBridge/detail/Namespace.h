@@ -83,7 +83,8 @@ class Namespace
 
     s = s + message;
 
-    return luaL_error (L, s.c_str ());
+    luaL_error (L, s.c_str ());
+    return 0;
   }
 #endif
 
@@ -125,10 +126,10 @@ class Namespace
       lua_pushstring (L, type_name.c_str ());
       lua_rawsetp (L, -2, getTypeKey ()); // co [typeKey] = name. Stack: ns, co
 
-      lua_pushcfunction (L, &CFunc::indexMetaMethod);
+      lua_pushcfunction (L, &CFunc::indexMetaMethod, "__index");
       rawsetfield (L, -2, "__index");
 
-      lua_pushcfunction (L, &CFunc::newindexObjectMetaMethod);
+      lua_pushcfunction (L, &CFunc::newindexObjectMetaMethod, "__newindex");
       rawsetfield (L, -2, "__newindex");
 
       lua_newtable (L);
@@ -180,13 +181,13 @@ class Namespace
 
 #if 0
       lua_pushlightuserdata (L, this);
-      lua_pushcclosure (L, &tostringMetaMethod, 1);
+      lua_pushcclosure (L, &tostringMetaMethod, "__tostring", 1);
       rawsetfield (L, -2, "__tostring");
 #endif
-      lua_pushcfunction (L, &CFunc::indexMetaMethod);
+      lua_pushcfunction (L, &CFunc::indexMetaMethod, "__index");
       rawsetfield (L, -2, "__index");
 
-      lua_pushcfunction (L, &CFunc::newindexStaticMetaMethod);
+      lua_pushcfunction (L, &CFunc::newindexStaticMetaMethod, "__newindex");
       rawsetfield (L, -2, "__newindex");
 
       lua_newtable (L); // Stack: ns, co, cl, st, proget table (pg)
@@ -304,13 +305,9 @@ class Namespace
         lua_pop (L, 1); // Stack: ns
 
         createConstTable (name); // Stack: ns, const table (co)
-        lua_pushcfunction (L, &CFunc::gcMetaMethod <T>); // Stack: ns, co, function
-        rawsetfield (L, -2, "__gc"); // Stack: ns, co
         ++m_stackSize;
 
         createClassTable (name); // Stack: ns, co, class table (cl)
-        lua_pushcfunction (L, &CFunc::gcMetaMethod <T>); // Stack: ns, co, cl, function
-        rawsetfield (L, -2, "__gc"); // Stack: ns, co, cl
         ++m_stackSize;
 
         createStaticTable (name); // Stack: ns, co, cl, st
@@ -350,13 +347,9 @@ class Namespace
       assert (lua_istable (L, -1)); // Stack: namespace table (ns)
 
       createConstTable (name); // Stack: ns, const table (co)
-      lua_pushcfunction (L, &CFunc::gcMetaMethod <T>); // Stack: ns, co, function
-      rawsetfield (L, -2, "__gc"); // Stack: ns, co
       ++m_stackSize;
 
       createClassTable (name); // Stack: ns, co, class table (cl)
-      lua_pushcfunction (L, &CFunc::gcMetaMethod <T>); // Stack: ns, co, cl, function
-      rawsetfield (L, -2, "__gc"); // Stack: ns, co, cl
       ++m_stackSize;
 
       createStaticTable (name); // Stack: ns, co, cl, st
@@ -409,18 +402,18 @@ class Namespace
       assertStackState (); // Stack: const table (co), class table (cl), static table (st)
 
       lua_pushlightuserdata (L, pu); // Stack: co, cl, st, pointer
-      lua_pushcclosure (L, &CFunc::getVariable <U>, 1); // Stack: co, cl, st, getter
+      lua_pushcclosure (L, &CFunc::getVariable <U>, name, 1); // Stack: co, cl, st, getter
       CFunc::addGetter (L, name, -2); // Stack: co, cl, st
 
       if (isWritable)
       {
         lua_pushlightuserdata (L, pu); // Stack: co, cl, st, ps, pointer
-        lua_pushcclosure (L, &CFunc::setVariable <U>, 1); // Stack: co, cl, st, ps, setter
+        lua_pushcclosure (L, &CFunc::setVariable <U>, name, 1); // Stack: co, cl, st, ps, setter
       }
       else
       {
         lua_pushstring (L, name); // Stack: co, cl, st, name
-        lua_pushcclosure (L, &CFunc::readOnlyError, 1); // Stack: co, cl, st, error_fn
+        lua_pushcclosure (L, &CFunc::readOnlyError, name, 1); // Stack: co, cl, st, error_fn
       }
       CFunc::addSetter (L, name, -2); // Stack: co, cl, st
 
@@ -440,19 +433,19 @@ class Namespace
 
       typedef U (*get_t) ();
       new (lua_newuserdata (L, sizeof (get))) get_t (get); // Stack: co, cl, st, function ptr
-      lua_pushcclosure (L, &CFunc::Call <U (*) (void)>::f, 1); // Stack: co, cl, st, getter
+      lua_pushcclosure (L, &CFunc::Call <U (*) (void)>::f, name, 1); // Stack: co, cl, st, getter
       CFunc::addGetter (L, name, -2); // Stack: co, cl, st
 
       if (set != 0)
       {
         typedef void (*set_t) (U);
         new (lua_newuserdata (L, sizeof (set))) set_t (set); // Stack: co, cl, st, function ptr
-        lua_pushcclosure (L, &CFunc::Call <void (*) (U)>::f, 1); // Stack: co, cl, st, setter
+        lua_pushcclosure (L, &CFunc::Call <void (*) (U)>::f, name, 1); // Stack: co, cl, st, setter
       }
       else
       {
         lua_pushstring (L, name); // Stack: co, cl, st, ps, name
-        lua_pushcclosure (L, &CFunc::readOnlyError, 1); // Stack: co, cl, st, error_fn
+        lua_pushcclosure (L, &CFunc::readOnlyError, name, 1); // Stack: co, cl, st, error_fn
       }
       CFunc::addSetter (L, name, -2); // Stack: co, cl, st
 
@@ -469,7 +462,7 @@ class Namespace
       assertStackState (); // Stack: const table (co), class table (cl), static table (st)
 
       new (lua_newuserdata (L, sizeof (fp))) FP (fp); // co, cl, st, function ptr
-      lua_pushcclosure (L, &CFunc::Call <FP>::f, 1); // co, cl, st, function
+      lua_pushcclosure (L, &CFunc::Call <FP>::f, name, 1); // co, cl, st, function
       rawsetfield (L, -2, name); // co, cl, st
 
       return *this;
@@ -483,7 +476,7 @@ class Namespace
     {
       assertStackState (); // Stack: const table (co), class table (cl), static table (st)
 
-      lua_pushcfunction (L, fp); // co, cl, st, function
+      lua_pushcfunction (L, fp, name); // co, cl, st, function
       rawsetfield (L, -2, name); // co, cl, st
 
       return *this;
@@ -500,7 +493,7 @@ class Namespace
 
       typedef const U T::*mp_t;
       new (lua_newuserdata (L, sizeof (mp_t))) mp_t (mp); // Stack: co, cl, st, field ptr
-      lua_pushcclosure (L, &CFunc::getProperty <T, U>, 1); // Stack: co, cl, st, getter
+      lua_pushcclosure (L, (&CFunc::getProperty <T, U>), name, 1); // Stack: co, cl, st, getter
       lua_pushvalue (L, -1); // Stack: co, cl, st, getter, getter
       CFunc::addGetter (L, name, -5); // Stack: co, cl, st, getter
       CFunc::addGetter (L, name, -3); // Stack: co, cl, st
@@ -508,7 +501,7 @@ class Namespace
       if (isWritable)
       {
         new (lua_newuserdata (L, sizeof (mp_t))) mp_t (mp); // Stack: co, cl, st, field ptr
-        lua_pushcclosure (L, &CFunc::setProperty <T, U>, 1); // Stack: co, cl, st, setter
+        lua_pushcclosure (L, (&CFunc::setProperty <T, U>), name, 1); // Stack: co, cl, st, setter
         CFunc::addSetter (L, name, -3); // Stack: co, cl, st
       }
 
@@ -528,7 +521,7 @@ class Namespace
 
       typedef void (T::* set_t) (TS);
       new (lua_newuserdata (L, sizeof (set_t))) set_t (set); // Stack: co, cl, st, function ptr
-      lua_pushcclosure (L, &CFunc::CallMember <set_t>::f, 1); // Stack: co, cl, st, setter
+      lua_pushcclosure (L, &CFunc::CallMember <set_t>::f, name, 1); // Stack: co, cl, st, setter
       CFunc::addSetter (L, name, -3); // Stack: co, cl, st
 
       return *this;
@@ -542,7 +535,7 @@ class Namespace
 
       typedef TG (T::*get_t) () const;
       new (lua_newuserdata (L, sizeof (get_t))) get_t (get); // Stack: co, cl, st, funcion ptr
-      lua_pushcclosure (L, &CFunc::CallConstMember <get_t>::f, 1); // Stack: co, cl, st, getter
+      lua_pushcclosure (L, &CFunc::CallConstMember <get_t>::f, name, 1); // Stack: co, cl, st, getter
       lua_pushvalue (L, -1); // Stack: co, cl, st, getter, getter
       CFunc::addGetter (L, name, -5); // Stack: co, cl, st, getter
       CFunc::addGetter (L, name, -3); // Stack: co, cl, st
@@ -568,7 +561,7 @@ class Namespace
 
       typedef TG (*get_t) (T const*);
       new (lua_newuserdata (L, sizeof (get_t))) get_t (get); // Stack: co, cl, st,, fn ptr
-      lua_pushcclosure (L, &CFunc::Call <get_t>::f, 1); // Stack: co, cl, st,, getter
+      lua_pushcclosure (L, &CFunc::Call <get_t>::f, name, 1); // Stack: co, cl, st,, getter
       lua_pushvalue (L, -1); // Stack: co, cl, st,, getter, getter
       CFunc::addGetter (L, name, -5); // Stack: co, cl, st,, getter
       CFunc::addGetter (L, name, -3); // Stack: co, cl, st,
@@ -577,7 +570,7 @@ class Namespace
       {
         typedef void (*set_t) (T*, TS);
         new (lua_newuserdata (L, sizeof (set_t))) set_t (set); // Stack: co, cl, st,, fn ptr
-        lua_pushcclosure (L, &CFunc::Call <set_t>::f, 1); // Stack: co, cl, st,, setter
+        lua_pushcclosure (L, &CFunc::Call <set_t>::f, name, 1); // Stack: co, cl, st,, setter
         CFunc::addSetter (L, name, -3); // Stack: co, cl, st,
       }
 
@@ -612,7 +605,7 @@ class Namespace
 
       typedef int (T::*MFP) (lua_State*);
       new (lua_newuserdata (L, sizeof (mfp))) MFP (mfp); // Stack: co, cl, st, function ptr
-      lua_pushcclosure (L, &CFunc::CallMemberCFunction <T>::f, 1); // Stack: co, cl, st, function
+      lua_pushcclosure (L, &CFunc::CallMemberCFunction <T>::f, name, 1); // Stack: co, cl, st, function
       rawsetfield (L, -3, name); // Stack: co, cl, st
 
       return *this;
@@ -628,7 +621,7 @@ class Namespace
 
       typedef int (T::*MFP) (lua_State*) const;
       new (lua_newuserdata (L, sizeof (mfp))) MFP (mfp);
-      lua_pushcclosure (L, &CFunc::CallConstMemberCFunction <T>::f, 1);
+      lua_pushcclosure (L, &CFunc::CallConstMemberCFunction <T>::f, name, 1);
       lua_pushvalue (L, -1); // Stack: co, cl, st, function, function
       rawsetfield (L, -4, name); // Stack: co, cl, st, function
       rawsetfield (L, -4, name); // Stack: co, cl, st
@@ -652,7 +645,7 @@ class Namespace
     {
       assertStackState (); // Stack: const table (co), class table (cl), static table (st)
 
-      lua_pushcclosure (L, &ctorContainerProxy <typename FuncTraits <MemFn>::Params, C>, 0);
+      lua_pushcclosure (L, (&ctorContainerProxy <typename FuncTraits <MemFn>::Params, C>), "__call", 0);
       rawsetfield (L, -2, "__call");
 
       return *this;
@@ -663,7 +656,7 @@ class Namespace
     {
       assertStackState (); // Stack: const table (co), class table (cl), static table (st)
 
-      lua_pushcclosure (L, &ctorPlacementProxy <typename FuncTraits <MemFn>::Params, T>, 0);
+      lua_pushcclosure (L, (&ctorPlacementProxy <typename FuncTraits <MemFn>::Params, T>), "__call", 0);
       rawsetfield (L, -2, "__call");
 
       return *this;
@@ -710,11 +703,11 @@ private:
       lua_setmetatable (L, -2); // Stack: pns, ns
 
       // ns.__index = indexMetaMethod
-      lua_pushcfunction (L, &CFunc::indexMetaMethod);
+      lua_pushcfunction (L, &CFunc::indexMetaMethod, "__index");
       rawsetfield (L, -2, "__index"); // Stack: pns, ns
 
       // ns.__newindex = newindexMetaMethod
-      lua_pushcfunction (L, &CFunc::newindexStaticMetaMethod);
+      lua_pushcfunction (L, &CFunc::newindexStaticMetaMethod, "__newindex");
       rawsetfield (L, -2, "__newindex"); // Stack: pns, ns
 
       lua_newtable (L); // Stack: pns, ns, propget table (pg)
@@ -727,7 +720,7 @@ private:
       lua_pushvalue (L, -1); // Stack: pns, ns, ns
       rawsetfield (L, -3, name); // Stack: pns, ns
 #if 0
-      lua_pushcfunction (L, &tostringMetaMethod);
+      lua_pushcfunction (L, &tostringMetaMethod, "__tostring");
       rawsetfield (L, -2, "__tostring");
 #endif
     }
@@ -811,18 +804,18 @@ public:
     assert (lua_istable (L, -1)); // Stack: namespace table (ns)
 
     lua_pushlightuserdata (L, pt); // Stack: ns, pointer
-    lua_pushcclosure (L, &CFunc::getVariable <T>, 1); // Stack: ns, getter
+    lua_pushcclosure (L, &CFunc::getVariable <T>, name, 1); // Stack: ns, getter
     CFunc::addGetter (L, name, -2); // Stack: ns
 
     if (isWritable)
     {
       lua_pushlightuserdata (L, pt); // Stack: ns, pointer
-      lua_pushcclosure (L, &CFunc::setVariable <T>, 1); // Stack: ns, setter
+      lua_pushcclosure (L, &CFunc::setVariable <T>, name, 1); // Stack: ns, setter
     }
     else
     {
       lua_pushstring (L, name); // Stack: ns, ps, name
-      lua_pushcclosure (L, &CFunc::readOnlyError, 1); // Stack: ns, error_fn
+      lua_pushcclosure (L, &CFunc::readOnlyError, name, 1); // Stack: ns, error_fn
     }
     CFunc::addSetter (L, name, -2); // Stack: ns
 
@@ -847,19 +840,19 @@ public:
 
     typedef TG (*get_t) ();
     new (lua_newuserdata (L, sizeof (get_t))) get_t (get); // Stack: ns, field ptr
-    lua_pushcclosure (L, &CFunc::Call <TG (*) (void)>::f, 1); // Stack: ns, getter
+    lua_pushcclosure (L, &CFunc::Call <TG (*) (void)>::f, name, 1); // Stack: ns, getter
     CFunc::addGetter (L, name, -2);
 
     if (set != 0)
     {
       typedef void (*set_t) (TS);
       new (lua_newuserdata (L, sizeof (set_t))) set_t (set);
-      lua_pushcclosure (L, &CFunc::Call <void (*) (TS)>::f, 1);
+      lua_pushcclosure (L, &CFunc::Call <void (*) (TS)>::f, name, 1);
     }
     else
     {
       lua_pushstring (L, name);
-      lua_pushcclosure (L, &CFunc::readOnlyError, 1);
+      lua_pushcclosure (L, &CFunc::readOnlyError, name, 1);
     }
     CFunc::addSetter (L, name, -2);
 
@@ -876,7 +869,7 @@ public:
     assert (lua_istable (L, -1)); // Stack: namespace table (ns)
 
     new (lua_newuserdata (L, sizeof (fp))) FP (fp);
-    lua_pushcclosure (L, &CFunc::Call <FP>::f, 1); // Stack: ns, function
+    lua_pushcclosure (L, &CFunc::Call <FP>::f, name, 1); // Stack: ns, function
     rawsetfield (L, -2, name); // Stack: ns
 
     return *this;
@@ -890,7 +883,7 @@ public:
   {
     assert (lua_istable (L, -1)); // Stack: namespace table (ns)
 
-    lua_pushcfunction (L, fp); // Stack: ns, function
+    lua_pushcfunction (L, fp, name); // Stack: ns, function
     rawsetfield (L, -2, name); // Stack: ns
 
     return *this;

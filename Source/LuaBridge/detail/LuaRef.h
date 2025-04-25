@@ -139,7 +139,7 @@ protected:
   int createRef () const
   {
     impl ().push ();
-    return luaL_ref (m_L, LUA_REGISTRYINDEX);
+    return lua_ref (m_L, -1);
   }
 
 public:
@@ -419,8 +419,9 @@ public:
   void append (T v) const
   {
     impl ().push ();;
+    lua_pushinteger (m_L, static_cast <lua_Integer> (lua_objlen (m_L, -1)) + 1);
     Stack <T>::push (m_L, v);
-    luaL_ref (m_L, -2);
+    lua_settable (m_L, -3);
     lua_pop (m_L, 1);
   }
 
@@ -598,10 +599,10 @@ class LuaRef : public LuaRefBase <LuaRef, LuaRef>
     Proxy (lua_State* L, int tableRef)
       : LuaRefBase (L)
       , m_tableRef (LUA_NOREF)
-      , m_keyRef (luaL_ref (L, LUA_REGISTRYINDEX))
+      , m_keyRef (lua_ref (L, -1))
     {
       lua_rawgeti (m_L, LUA_REGISTRYINDEX, tableRef);
-      m_tableRef = luaL_ref (L, LUA_REGISTRYINDEX);
+      m_tableRef = lua_ref (L, -1);
     }
 
     //--------------------------------------------------------------------------
@@ -618,10 +619,10 @@ class LuaRef : public LuaRefBase <LuaRef, LuaRef>
       , m_keyRef (LUA_NOREF)
     {
       lua_rawgeti (m_L, LUA_REGISTRYINDEX, other.m_tableRef);
-      m_tableRef = luaL_ref (m_L, LUA_REGISTRYINDEX);
+      m_tableRef = lua_ref (m_L, -1);
 
       lua_rawgeti (m_L, LUA_REGISTRYINDEX, other.m_keyRef);
-      m_keyRef = luaL_ref (m_L, LUA_REGISTRYINDEX);
+      m_keyRef = lua_ref (m_L, -1);
     }
 
     //--------------------------------------------------------------------------
@@ -632,8 +633,8 @@ class LuaRef : public LuaRefBase <LuaRef, LuaRef>
     */
     ~Proxy ()
     {
-      luaL_unref (m_L, LUA_REGISTRYINDEX, m_keyRef);
-      luaL_unref (m_L, LUA_REGISTRYINDEX, m_tableRef);
+      lua_unref (m_L, m_keyRef);
+      lua_unref (m_L, m_tableRef);
     }
 
     //--------------------------------------------------------------------------
@@ -728,7 +729,7 @@ class LuaRef : public LuaRefBase <LuaRef, LuaRef>
   */
   LuaRef (lua_State* L, FromStack)
     : LuaRefBase (L)
-    , m_ref (luaL_ref (m_L, LUA_REGISTRYINDEX))
+    , m_ref (lua_ref (m_L, -1))
   {
   }
 
@@ -746,7 +747,7 @@ class LuaRef : public LuaRefBase <LuaRef, LuaRef>
     , m_ref (LUA_NOREF)
   {
     lua_pushvalue (m_L, index);
-    m_ref = luaL_ref (m_L, LUA_REGISTRYINDEX);
+    m_ref = lua_ref (m_L, -1);
   }
 
 
@@ -773,7 +774,7 @@ public:
     , m_ref (LUA_NOREF)
   {
     Stack <T>::push (m_L, v);
-    m_ref = luaL_ref (m_L, LUA_REGISTRYINDEX);
+    m_ref = lua_ref (m_L, -1);
   }
 
   //----------------------------------------------------------------------------
@@ -808,7 +809,7 @@ public:
   */
   ~LuaRef ()
   {
-    luaL_unref (m_L, LUA_REGISTRYINDEX, m_ref);
+    lua_unref (m_L, m_ref);
   }
 
   //----------------------------------------------------------------------------
@@ -924,8 +925,8 @@ public:
   */
   void pop ()
   {
-    luaL_unref (m_L, LUA_REGISTRYINDEX, m_ref);
-    m_ref = luaL_ref (m_L, LUA_REGISTRYINDEX);
+    lua_unref (m_L, m_ref);
+    m_ref = lua_ref (m_L, -1);
   }
 
   //----------------------------------------------------------------------------

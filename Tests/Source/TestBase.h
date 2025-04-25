@@ -52,7 +52,7 @@ struct TestBase : public ::testing::Test
     L = nullptr;
     L = luaL_newstate ();
     luaL_openlibs (L);
-    lua_pushcfunction (L, &traceback);
+    lua_pushcfunction (L, &traceback, nullptr);
   }
 
   void TearDown () override

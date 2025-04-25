@@ -75,7 +75,7 @@ protected:
   /**
     Get an untyped pointer to the contained class.
   */
-  inline void* const getPointer ()
+  inline void* getPointer ()
   {
     return m_p;
   }
@@ -370,6 +370,11 @@ private:
     getObject ()->~T ();
   }
 
+  static void destroy(void * ud)
+  {
+      reinterpret_cast <UserdataValue <T> *> (ud)->~UserdataValue();
+  }
+
 public:
   /**
     Push a T via placement new.
@@ -380,7 +385,7 @@ public:
   static void* place (lua_State* const L)
   {
     UserdataValue <T>* const ud = new (
-      lua_newuserdata (L, sizeof (UserdataValue <T>))) UserdataValue <T> ();
+      lua_newuserdatadtor (L, sizeof (UserdataValue <T>), destroy)) UserdataValue <T> ();
     lua_rawgetp (L, LUA_REGISTRYINDEX, ClassInfo <T>::getClassKey ());
     if (!lua_istable (L, -1))
     {
@@ -531,6 +536,11 @@ public:
     m_p = const_cast <void*> (reinterpret_cast <void const*> (
         (ContainerTraits <C>::get (m_c))));
   }
+
+  static void destroy(void * ud)
+  {
+      reinterpret_cast <UserdataShared<C>*> (ud)->~UserdataShared();
+  }
 };
 
 //----------------------------------------------------------------------------
@@ -549,7 +559,7 @@ struct UserdataSharedHelper
   {
     if (ContainerTraits <C>::get (c) != 0)
     {
-      new (lua_newuserdata (L, sizeof (UserdataShared <C>))) UserdataShared <C> (c);
+      new (lua_newuserdatadtor (L, sizeof (UserdataShared <C>), UserdataShared <C>::destroy)) UserdataShared <C> (c);
       lua_rawgetp (L, LUA_REGISTRYINDEX, ClassInfo <T>::getClassKey ());
       // If this goes off it means the class T is unregistered!
       assert (lua_istable (L, -1));
@@ -565,7 +575,7 @@ struct UserdataSharedHelper
   {
     if (t)
     {
-      new (lua_newuserdata (L, sizeof (UserdataShared <C>))) UserdataShared <C> (t);
+      new (lua_newuserdatadtor (L, sizeof (UserdataShared <C>), UserdataShared <C>::destroy)) UserdataShared <C> (t);
       lua_rawgetp (L, LUA_REGISTRYINDEX, ClassInfo <T>::getClassKey ());
       // If this goes off it means the class T is unregistered!
       assert (lua_istable (L, -1));
@@ -589,7 +599,7 @@ struct UserdataSharedHelper <C, true>
   {
     if (ContainerTraits <C>::get (c) != 0)
     {
-      new (lua_newuserdata (L, sizeof (UserdataShared <C>))) UserdataShared <C> (c);
+      new (lua_newuserdatadtor (L, sizeof (UserdataShared <C>), UserdataShared <C>::destroy)) UserdataShared <C> (c);
       lua_rawgetp (L, LUA_REGISTRYINDEX, ClassInfo <T>::getConstKey ());
       // If this goes off it means the class T is unregistered!
       assert (lua_istable (L, -1));
@@ -605,7 +615,7 @@ struct UserdataSharedHelper <C, true>
   {
     if (t)
     {
-      new (lua_newuserdata (L, sizeof (UserdataShared <C>))) UserdataShared <C> (t);
+      new (lua_newuserdatadtor (L, sizeof (UserdataShared <C>), UserdataShared <C>::destroy)) UserdataShared <C> (t);
       lua_rawgetp (L, LUA_REGISTRYINDEX, ClassInfo <T>::getConstKey ());
       // If this goes off it means the class T is unregistered!
       assert (lua_istable (L, -1));

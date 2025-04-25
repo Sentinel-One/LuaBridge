@@ -62,7 +62,7 @@ struct Stack <lua_CFunction>
 {
   static void push (lua_State* L, lua_CFunction f)
   {
-    lua_pushcfunction (L, f);
+    lua_pushcfunction (L, f, nullptr);
   }
 
   static lua_CFunction get (lua_State* L, int index)

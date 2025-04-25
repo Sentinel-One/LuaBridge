@@ -33,7 +33,7 @@ struct Stack <std::array <T,s> >
     }
     if (index != s)
     {
-      luaL_error (L, "array size should be %d ", s);
+      luaL_error (L, "array size should be %d ", static_cast <int> (s));
     }
 
     std::array <T, s> array;

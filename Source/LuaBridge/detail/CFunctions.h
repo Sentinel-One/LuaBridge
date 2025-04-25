@@ -159,7 +159,8 @@ struct CFunc
       if (lua_isnil (L, -1)) // Stack: mt, nil
       {
         lua_pop (L, 2); // Stack: -
-        return luaL_error (L, "No member named '%s'", lua_tostring (L, 2));
+        luaL_error (L, "No member named '%s'", lua_tostring (L, 2));
+        return 0;
       }
 
       assert (lua_istable (L, -1));
@@ -188,7 +189,8 @@ struct CFunc
       if (lua_isnil (L, -1)) // Stack: mt, nil
       {
         lua_pop (L, 1); // Stack: -
-        return luaL_error (L, "No writable member '%s'", lua_tostring (L, 2));
+        luaL_error (L, "No writable member '%s'", lua_tostring (L, 2));
+        return 0;
       }
 
       assert (lua_istable (L, -1)); // Stack: mt, parent mt
@@ -211,7 +213,8 @@ struct CFunc
 
     s = s + "'" + lua_tostring (L, lua_upvalueindex (1)) + "' is read-only";
 
-    return luaL_error (L, s.c_str ());
+    luaL_error (L, s.c_str ());
+    return 0;
   }
 
   //----------------------------------------------------------------------------
@@ -474,7 +477,7 @@ struct CFunc
     static void add (lua_State* L, char const* name, MemFnPtr mf)
     {
       new (lua_newuserdata (L, sizeof (MemFnPtr))) MemFnPtr (mf);
-      lua_pushcclosure (L, &CallConstMember <MemFnPtr>::f, 1);
+      lua_pushcclosure (L, &CallConstMember <MemFnPtr>::f, name, 1);
       lua_pushvalue (L, -1);
       rawsetfield (L, -5, name); // const table
       rawsetfield (L, -3, name); // class table
@@ -487,23 +490,10 @@ struct CFunc
     static void add (lua_State* L, char const* name, MemFnPtr mf)
     {
       new (lua_newuserdata (L, sizeof (MemFnPtr))) MemFnPtr (mf);
-      lua_pushcclosure (L, &CallMember <MemFnPtr>::f, 1);
+      lua_pushcclosure (L, &CallMember <MemFnPtr>::f, name, 1);
       rawsetfield (L, -3, name); // class table
     }
   };
-
-  //--------------------------------------------------------------------------
-  /**
-      __gc metamethod for a class.
-  */
-  template <class C>
-  static int gcMetaMethod (lua_State* L)
-  {
-    Userdata* const ud = Userdata::getExact <C> (L, 1);
-    lua_getmetatable (L, 1);
-    ud->~Userdata ();
-    return 0;
-  }
 
   //--------------------------------------------------------------------------
   /**

@@ -35,15 +35,7 @@ namespace luabridge {
 
 // These are for Lua versions prior to 5.2.0.
 //
-#if LUA_VERSION_NUM < 502
-inline int lua_absindex (lua_State* L, int idx)
-{
-  if (idx > LUA_REGISTRYINDEX && idx < 0)
-    return lua_gettop (L) + idx + 1;
-  else
-    return idx;
-}
-
+#if 1
 inline void lua_rawgetp (lua_State* L, int idx, void const* p)
 {
   idx = lua_absindex (L, idx);
