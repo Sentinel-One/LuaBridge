@@ -17,11 +17,12 @@ struct Stack <std::array <T,s> >
   static void push (lua_State* L, std::array <T,s> const& array)
   {
     lua_createtable (L, static_cast <int> (s), 0);
+    const int table_index = lua_gettop(L);
+
     for (std::size_t i = 0; i < s; ++i)
     {
-      lua_pushinteger (L, static_cast <lua_Integer> (i + 1));
       Stack <T>::push (L, array [i]);
-      lua_settable (L, -3);
+      lua_rawseti(L, table_index, i + 1);
     }
   }
 
